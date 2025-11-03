@@ -76,6 +76,5 @@ fn main() {
 
     let mut chip8 = Chip8::default();
 
-    chip8.load_program(&args[1]);.
-
+    chip8.load_program(&args[1]);
 }
