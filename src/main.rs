@@ -1,70 +1,16 @@
-use std::env;
-use std::fs;
+use std::{
+    env,
+    time::{Duration, Instant},
+};
 
+use sdl2::{self, event::Event, keyboard::Scancode};
+
+mod chip8;
 mod chip8_stack;
 
-struct Display {
-    buffer: [u8; 64 * 32],
-}
-
-impl Default for Display {
-    fn default() -> Self {
-        Self {
-            buffer: [0; 64 * 32],
-        }
-    }
-}
-
-struct Chip8 {
-    ram: [u8; 4096],
-    v_reg: [u8; 16],
-    i_reg: u16,
-    delay_timer: u16,
-    sound_timer: u16,
-    pc: u16,
-    stack: chip8_stack::Chip8Stack,
-    keypad: [bool; 16],
-    display: Display,
-}
-
-impl Default for Chip8 {
-    fn default() -> Self {
-        let mut chip_8 = Self {
-            ram: [0; 4096],
-            v_reg: [0; 16],
-            i_reg: 0,
-            delay_timer: 0,
-            sound_timer: 0,
-            pc: 0x200,
-            stack: chip8_stack::Chip8Stack::default(),
-            keypad: [false; 16],
-            display: Display::default(),
-        };
-
-        const FONT_SET: [u8; 80] = [
-            0xF0, 0x90, 0x90, 0x90, 0xF0, 0x20, 0x60, 0x20, 0x20, 0x70, 0xF0, 0x10, 0xF0, 0x80,
-            0xF0, 0xF0, 0x10, 0xF0, 0x10, 0xF0, 0x90, 0x90, 0xF0, 0x10, 0x10, 0xF0, 0x80, 0xF0,
-            0x10, 0xF0, 0xF0, 0x80, 0xF0, 0x90, 0xF0, 0xF0, 0x10, 0x20, 0x40, 0x40, 0xF0, 0x90,
-            0xF0, 0x90, 0xF0, 0xF0, 0x90, 0xF0, 0x10, 0xF0, 0xF0, 0x90, 0xF0, 0x90, 0x90, 0xE0,
-            0x90, 0xE0, 0x90, 0xE0, 0xF0, 0x80, 0x80, 0x80, 0xF0, 0xE0, 0x90, 0x90, 0x90, 0xE0,
-            0xF0, 0x80, 0xF0, 0x80, 0xF0, 0xF0, 0x80, 0xF0, 0x80, 0x80,
-        ];
-
-        chip_8.ram[0..80].copy_from_slice(&FONT_SET);
-        chip_8
-    }
-}
-
-impl Chip8 {
-    fn load_program(&mut self, str_path: &String) {
-        if let Ok(bytes) = fs::read(str_path) {
-            if bytes.len() > self.ram.len() - 0x200 {
-                panic!("Program too large for Chip-8 memory");
-            }
-            self.ram[0x200..0x200 + bytes.len()].copy_from_slice(&bytes);
-        }
-    }
-}
+static ZOOM: u32 = 10;
+static CHIP8_IPS: f64 = 700.;
+static TIMER_HZ: f64 = 60.;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -74,7 +20,60 @@ fn main() {
         std::process::exit(1);
     }
 
-    let mut chip8 = Chip8::default();
+    let mut chip8 = chip8::Chip8::default();
 
-    chip8.load_program(&args[1]);
+    if let Err(e) = chip8.load_program(&args[1]) {
+        eprintln!("Program load error: {e}");
+        std::process::exit(1);
+    }
+
+    let sdl_context = sdl2::init().unwrap();
+    let video_subsystem = sdl_context.video().unwrap();
+    let window = video_subsystem
+        .window("yac8int", 64 * ZOOM, 32 * ZOOM)
+        .position_centered()
+        .build()
+        .unwrap();
+    let mut canvas = window.into_canvas().build().unwrap();
+
+    canvas.set_draw_color(sdl2::pixels::Color::RGB(0, 255, 255));
+    canvas.clear();
+    canvas.present();
+    let mut event_pump = sdl_context.event_pump().unwrap();
+    let mut i = 0;
+    let mut last_time = Instant::now();
+
+    let mut chip8_acc: f64 = 0.;
+    let mut timer_acc: f64 = 0.;
+    'game: loop {
+        i = (i + 1) % 255;
+        for event in event_pump.poll_iter() {
+            match event {
+                Event::Quit { .. }
+                | Event::KeyDown {
+                    scancode: Some(Scancode::Escape),
+                    ..
+                } => break 'game,
+                _ => {}
+            }
+        }
+
+        let time_now = Instant::now();
+        let dt = (time_now - last_time).as_secs_f64();
+        last_time = time_now;
+
+        chip8_acc += dt * CHIP8_IPS;
+        timer_acc += dt * TIMER_HZ;
+        while chip8_acc > 0. {
+            todo!(); // Step the chip8
+            chip8_acc -= 1.;
+        }
+        while timer_acc > 0. {
+            chip8.step_timers();
+            timer_acc -= 1.;
+        }
+
+        canvas.present();
+        ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
+    }
 }
