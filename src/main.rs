@@ -40,13 +40,11 @@ fn main() {
     canvas.clear();
     canvas.present();
     let mut event_pump = sdl_context.event_pump().unwrap();
-    let mut i = 0;
     let mut last_time = Instant::now();
 
     let mut chip8_acc: f64 = 0.;
     let mut timer_acc: f64 = 0.;
     'game: loop {
-        i = (i + 1) % 255;
         for event in event_pump.poll_iter() {
             match event {
                 Event::Quit { .. }
