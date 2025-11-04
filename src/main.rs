@@ -1,77 +1,81 @@
 use std::{
     env,
+    io::{self, Write},
     time::{Duration, Instant},
 };
-
-use sdl2::{self, event::Event, keyboard::Scancode};
 
 mod chip8;
 mod chip8_stack;
 
-static ZOOM: u32 = 10;
-static CHIP8_IPS: f64 = 1.;
-static TIMER_HZ: f64 = 60.;
+static CHIP8_IPS: f64 = 700.;
+static TIMER_HZ: f64 = 60.0;
+
+fn clear_screen() {
+    // ANSI: clear screen and move cursor to 1;1
+    print!("\x1B[2J\x1B[H");
+}
+
+fn draw_console(buf: &[u8], width: usize, height: usize) {
+    let mut out = String::with_capacity((width + 1) * height);
+    for y in 0..height {
+        let row = &buf[y * width..(y + 1) * width];
+        for &px in row {
+            // Full block for "on", space for "off"
+            out.push(if px != 0 { '█' } else { ' ' });
+        }
+        out.push('\n');
+    }
+    print!("{}", out);
+    let _ = io::stdout().flush();
+}
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    dbg!(&args);
     if args.len() != 2 {
-        println!("usage: yac8int path/to/chip8/program");
+        eprintln!("usage: yac8int path/to/chip8/program");
         std::process::exit(1);
     }
 
     let mut chip8 = chip8::Chip8::default();
-
     if let Err(e) = chip8.load_program(&args[1]) {
         eprintln!("Program load error: {e}");
         std::process::exit(1);
     }
 
-    let sdl_context = sdl2::init().unwrap();
-    let video_subsystem = sdl_context.video().unwrap();
-    let window = video_subsystem
-        .window("yac8int", 64 * ZOOM, 32 * ZOOM)
-        .position_centered()
-        .build()
-        .unwrap();
-    let mut canvas = window.into_canvas().build().unwrap();
-
-    canvas.set_draw_color(sdl2::pixels::Color::RGB(0, 255, 255));
-    canvas.clear();
-    canvas.present();
-    let mut event_pump = sdl_context.event_pump().unwrap();
     let mut last_time = Instant::now();
+    let mut chip8_acc = 0.0;
+    let mut timer_acc = 0.0;
 
-    let mut chip8_acc: f64 = 0.;
-    let mut timer_acc: f64 = 0.;
-    'game: loop {
-        for event in event_pump.poll_iter() {
-            match event {
-                Event::Quit { .. }
-                | Event::KeyDown {
-                    scancode: Some(Scancode::Escape),
-                    ..
-                } => break 'game,
-                _ => {}
-            }
-        }
+    clear_screen();
 
-        let time_now = Instant::now();
-        let dt = (time_now - last_time).as_secs_f64();
-        last_time = time_now;
+    // Assumes CHIP-8 logical size 64x32
+    let w = 64usize;
+    let h = 32usize;
+
+    loop {
+        let now = Instant::now();
+        let dt = (now - last_time).as_secs_f64();
+        last_time = now;
 
         chip8_acc += dt * CHIP8_IPS;
         timer_acc += dt * TIMER_HZ;
-        while chip8_acc > 0. {
+
+        while chip8_acc >= 1.0 {
             chip8.step();
-            chip8_acc -= 1.;
+            chip8_acc -= 1.0;
         }
-        while timer_acc > 0. {
+        while timer_acc >= 1.0 {
             chip8.step_timers();
-            timer_acc -= 1.;
+            timer_acc -= 1.0;
         }
 
-        canvas.present();
-        ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
+        if chip8.dirty() {
+            // Reposition cursor to top-left before redraw to avoid full clear flicker
+            print!("\x1B[H");
+            draw_console(chip8.display_buffer(), w, h);
+            chip8.clear_dirty();
+        }
+
+        std::thread::sleep(Duration::from_micros(1_000_000 / 60));
     }
 }
