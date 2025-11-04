@@ -9,7 +9,7 @@ mod chip8;
 mod chip8_stack;
 
 static ZOOM: u32 = 10;
-static CHIP8_IPS: f64 = 700.;
+static CHIP8_IPS: f64 = 1.;
 static TIMER_HZ: f64 = 60.;
 
 fn main() {
@@ -63,7 +63,7 @@ fn main() {
         chip8_acc += dt * CHIP8_IPS;
         timer_acc += dt * TIMER_HZ;
         while chip8_acc > 0. {
-            todo!(); // Step the chip8
+            chip8.step();
             chip8_acc -= 1.;
         }
         while timer_acc > 0. {

@@ -60,4 +60,45 @@ impl Chip8 {
         self.delay_timer = self.delay_timer.saturating_sub(1);
         self.sound_timer = self.sound_timer.saturating_sub(1);
     }
+
+    fn fetch(&self) -> u16 {
+        let pc = self.pc as usize;
+        ((self.ram[pc] as u16) << 8) | self.ram[pc + 1] as u16
+    }
+
+    fn decode_execute(&mut self, op: u16) {
+        let nibble_1 = (op & 0xF000) >> 12;
+        println!("Nibble 1: {:01X}", nibble_1);
+        match nibble_1 {
+            0 => {
+                println!("Clearing screen");
+            }
+            1 => {
+                println!("Jump");
+            }
+            6 => {
+                println!("Set register VX");
+            }
+            7 => {
+                println!("Add to VX");
+            }
+            0xA => {
+                println!("Set index register i")
+            }
+            0xD => {
+                println!("Draw");
+            }
+            _ => {
+                println!("Unimplemented");
+            }
+        }
+    }
+
+    pub fn step(&mut self) {
+        // Read 2 bytes at the PC
+        let op = self.fetch();
+        self.pc += 2;
+        println!("Fetched {:04X}", op);
+        self.decode_execute(op);
+    }
 }
