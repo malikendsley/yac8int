@@ -10,6 +10,7 @@ pub struct Chip8 {
     stack: chip8_stack::Chip8Stack,
     keypad: [bool; 16],
     buffer: [u8; 64 * 32],
+    dirty: bool,
 }
 
 impl Default for Chip8 {
@@ -24,6 +25,7 @@ impl Default for Chip8 {
             stack: chip8_stack::Chip8Stack::default(),
             keypad: [false; 16],
             buffer: [0; 64 * 32],
+            dirty: false,
         };
 
         const FONT_SET: [u8; 80] = [
