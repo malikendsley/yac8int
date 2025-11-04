@@ -28,7 +28,7 @@ const fn idx_from_coord(x: usize, y: usize) -> usize {
 
 pub struct Chip8 {
     ram: [u8; 4096],
-    v_reg: [u8; 16],
+    v: [u8; 16],
     i_reg: u16,
     delay_timer: u16,
     sound_timer: u16,
@@ -43,7 +43,7 @@ impl Default for Chip8 {
     fn default() -> Self {
         let mut chip_8 = Self {
             ram: [0; 4096],
-            v_reg: [0; 16],
+            v: [0; 16],
             i_reg: 0,
             delay_timer: 0,
             sound_timer: 0,
@@ -114,13 +114,28 @@ impl Chip8 {
                 self.pc = nnn(op);
                 // println!("Jump");
             }
+            3 => {
+                if self.v[x(op) as usize] == nn(op) {
+                    self.pc += 2;
+                }
+            }
+            4 => {
+                if self.v[x(op) as usize] != nn(op) {
+                    self.pc += 2;
+                }
+            }
+            5 => {
+                if self.v[x(op) as usize] == self.v[y(op) as usize] {
+                    self.pc += 2;
+                }
+            }
             6 => {
-                self.v_reg[x(op) as usize] = nn(op);
+                self.v[x(op) as usize] = nn(op);
                 // println!("Set register VX");
             }
             7 => {
                 // Cover overflow
-                self.v_reg[x(op) as usize] = self.v_reg[x(op) as usize].wrapping_add(nn(op));
+                self.v[x(op) as usize] = self.v[x(op) as usize].wrapping_add(nn(op));
                 // println!("Add to VX");
             }
             0xA => {
@@ -129,12 +144,12 @@ impl Chip8 {
             }
             0xD => {
                 // Coordinates
-                let x0 = self.v_reg[x(op) as usize] as usize;
-                let y0 = self.v_reg[y(op) as usize] as usize;
+                let x0 = self.v[x(op) as usize] as usize;
+                let y0 = self.v[y(op) as usize] as usize;
                 // Clip the sprite
                 let h = (n(op) as usize).min(SCREEN_HEIGHT - y0);
                 let w = 8usize.min(SCREEN_WIDTH - x0);
-                self.v_reg[0xF] = 0;
+                self.v[0xF] = 0;
 
                 for row in 0..h {
                     let b = self.ram[self.i_reg as usize + row];
@@ -147,7 +162,7 @@ impl Chip8 {
                         let prev = self.display_buffer[idx];
                         self.display_buffer[idx] ^= 1;
                         if prev == 1 {
-                            self.v_reg[0xF] = 1;
+                            self.v[0xF] = 1;
                         }
                     }
                 }
@@ -156,7 +171,7 @@ impl Chip8 {
             }
             _ => {
                 println!("Unimplemented");
-                panic!();
+                // panic!();
             }
         }
     }
