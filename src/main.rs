@@ -1,32 +1,29 @@
+use sdl2::{event::Event, keyboard::Scancode, pixels::PixelFormatEnum, render::TextureAccess};
 use std::{
     env,
-    io::{self, Write},
     time::{Duration, Instant},
 };
 
 mod chip8;
 mod chip8_stack;
 
+const W: u32 = 64;
+const H: u32 = 32;
+const SCALE: u32 = 10;
 static CHIP8_IPS: f64 = 700.;
 static TIMER_HZ: f64 = 60.0;
 
-fn clear_screen() {
-    // ANSI: clear screen and move cursor to 1;1
-    print!("\x1B[2J\x1B[H");
-}
-
-fn draw_console(buf: &[u8], width: usize, height: usize) {
-    let mut out = String::with_capacity((width + 1) * height);
-    for y in 0..height {
-        let row = &buf[y * width..(y + 1) * width];
-        for &px in row {
-            // Full block for "on", space for "off"
-            out.push(if px != 0 { '█' } else { ' ' });
+fn draw_to_texture(chip8: &chip8::Chip8, tex: &mut sdl2::render::Texture, rgb_buf: &mut [u8]) {
+    let fb = chip8.display_buffer();
+    for y in 0..H as usize {
+        for x in 0..W as usize {
+            let i = (y * W as usize + x) * 3;
+            let on = fb[y * W as usize + x] != 0;
+            let v = if on { 0xFF } else { 0x00 };
+            rgb_buf[i..i + 3].copy_from_slice(&[v, v, v]);
         }
-        out.push('\n');
     }
-    print!("{}", out);
-    let _ = io::stdout().flush();
+    tex.update(None, rgb_buf, (W * 3) as usize).unwrap();
 }
 
 fn main() {
@@ -42,17 +39,43 @@ fn main() {
         std::process::exit(1);
     }
 
+    let sdl = sdl2::init().unwrap();
+    let video = sdl.video().unwrap();
+    let window = video
+        .window("yac8int", W * SCALE, H * SCALE)
+        .position_centered()
+        .build()
+        .unwrap();
+    let mut canvas = window
+        .into_canvas()
+        .accelerated()
+        .present_vsync()
+        .build()
+        .unwrap();
+
+    let creator = canvas.texture_creator();
+    let mut tex = creator
+        .create_texture(PixelFormatEnum::RGB24, TextureAccess::Streaming, W, H)
+        .unwrap();
+    let mut rgb_buf = vec![0u8; (W * H * 3) as usize];
+
+    let mut event_pump = sdl.event_pump().unwrap();
     let mut last_time = Instant::now();
     let mut chip8_acc = 0.0;
     let mut timer_acc = 0.0;
 
-    clear_screen();
+    'game: loop {
+        for e in event_pump.poll_iter() {
+            match e {
+                Event::Quit { .. }
+                | Event::KeyDown {
+                    scancode: Some(Scancode::Escape),
+                    ..
+                } => break 'game,
+                _ => {}
+            }
+        }
 
-    // Assumes CHIP-8 logical size 64x32
-    let w = 64usize;
-    let h = 32usize;
-
-    loop {
         let now = Instant::now();
         let dt = (now - last_time).as_secs_f64();
         last_time = now;
@@ -70,11 +93,13 @@ fn main() {
         }
 
         if chip8.dirty() {
-            // Reposition cursor to top-left before redraw to avoid full clear flicker
-            print!("\x1B[H");
-            draw_console(chip8.display_buffer(), w, h);
+            draw_to_texture(&chip8, &mut tex, &mut rgb_buf);
             chip8.clear_dirty();
         }
+
+        canvas.clear();
+        canvas.copy(&tex, None, None).unwrap();
+        canvas.present();
 
         std::thread::sleep(Duration::from_micros(1_000_000 / 60));
     }
