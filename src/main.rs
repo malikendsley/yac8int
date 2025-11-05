@@ -34,10 +34,7 @@ fn main() {
     }
 
     let mut chip8 = chip8::Chip8::default();
-    if let Err(e) = chip8.load_program(&args[1]) {
-        eprintln!("Program load error: {e}");
-        std::process::exit(1);
-    }
+    chip8.load_program(&args[1]).unwrap();
 
     let sdl = sdl2::init().unwrap();
     let video = sdl.video().unwrap();
