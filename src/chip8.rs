@@ -174,6 +174,24 @@ impl Chip8 {
                 }
                 self.dirty = true;
             }
+
+            0xE => match nn(op) {
+                0x009E => {
+                    if self.keypad[self.v[x(op)] as usize] == true {
+                        self.pc += 2;
+                    }
+                }
+                0x00A1 => {
+                    if self.keypad[self.v[x(op)] as usize] == false {
+                        self.pc += 2;
+                    }
+                }
+
+                _ => {
+                    panic!("Unsupported E-type instruction");
+                }
+            },
+
             _ => {
                 println!("Unrecognized instruction");
             }
