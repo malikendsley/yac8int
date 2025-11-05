@@ -92,9 +92,9 @@ fn main() {
             timer_acc -= 1.0;
         }
 
-        if chip8.dirty() {
+        if chip8.dirty {
             draw_to_texture(&chip8, &mut tex, &mut rgb_buf);
-            chip8.clear_dirty();
+            chip8.dirty = false;
         }
 
         canvas.clear();
