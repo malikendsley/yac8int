@@ -1,4 +1,5 @@
 use crate::chip8_stack;
+use rand::prelude::*;
 
 pub static SCREEN_WIDTH: usize = 64;
 pub static SCREEN_HEIGHT: usize = 32;
@@ -6,14 +7,14 @@ pub static SCREEN_AREA: usize = SCREEN_WIDTH * SCREEN_HEIGHT;
 
 // TODO: Simple tests
 // TODO: Depending on usage, this (these) may become *size
-const fn x(op: u16) -> u8 {
-    ((op & 0x0F00) >> 8) as u8
+const fn x(op: u16) -> usize {
+    ((op & 0x0F00) >> 8) as usize
 }
-const fn y(op: u16) -> u8 {
-    ((op & 0x00F0) >> 4) as u8
+const fn y(op: u16) -> usize {
+    ((op & 0x00F0) >> 4) as usize
 }
-const fn n(op: u16) -> u8 {
-    (op & 0x000F) as u8
+const fn n(op: u16) -> usize {
+    (op & 0x000F) as usize
 }
 // kk depending on who you ask
 const fn nn(op: u16) -> u8 {
@@ -100,54 +101,59 @@ impl Chip8 {
                 match op {
                     0x00E0 => {
                         self.display_buffer = [0; SCREEN_AREA];
-                        // TODO: Later, track lit pixels count
                         self.dirty = true;
-                        // println!("Clearing screen");
                     }
+                    0x00EE => self.pc = self.stack.pop(),
                     _ => {
-                        println!("Unimplemented");
-                        panic!();
+                        // 0 ops besides 0x00E0 and 0x0EE are ignored on modern interpreters
                     }
                 }
             }
-            1 => {
+            1 => self.pc = nnn(op),
+
+            2 => {
+                self.stack.push(self.pc);
                 self.pc = nnn(op);
-                // println!("Jump");
             }
             3 => {
-                if self.v[x(op) as usize] == nn(op) {
+                if self.v[x(op)] == nn(op) {
                     self.pc += 2;
                 }
             }
             4 => {
-                if self.v[x(op) as usize] != nn(op) {
+                if self.v[x(op)] != nn(op) {
                     self.pc += 2;
                 }
             }
             5 => {
-                if self.v[x(op) as usize] == self.v[y(op) as usize] {
+                if self.v[x(op)] == self.v[y(op)] {
                     self.pc += 2;
                 }
             }
-            6 => {
-                self.v[x(op) as usize] = nn(op);
-                // println!("Set register VX");
+            6 => self.v[x(op)] = nn(op),
+
+            7 => self.v[x(op)] = self.v[x(op)].wrapping_add(nn(op)), // Cover overflow
+
+            8 => {}
+
+            9 => {
+                if self.v[x(op)] != self.v[y(op)] {
+                    self.pc += 2;
+                }
             }
-            7 => {
-                // Cover overflow
-                self.v[x(op) as usize] = self.v[x(op) as usize].wrapping_add(nn(op));
-                // println!("Add to VX");
-            }
-            0xA => {
-                self.i_reg = nnn(op);
-                // println!("Set index register i")
-            }
+
+            0xA => self.i_reg = nnn(op),
+
+            0xB => self.pc = nnn(op) + self.v[0] as u16,
+
+            0xC => self.v[x(op)] = ((rand::rng().next_u32() & 0xFFFF) as u8) & nn(op),
+
             0xD => {
                 // Coordinates
-                let x0 = self.v[x(op) as usize] as usize;
-                let y0 = self.v[y(op) as usize] as usize;
+                let x0 = self.v[x(op)] as usize;
+                let y0 = self.v[y(op)] as usize;
                 // Clip the sprite
-                let h = (n(op) as usize).min(SCREEN_HEIGHT - y0);
+                let h = n(op).min(SCREEN_HEIGHT - y0);
                 let w = 8usize.min(SCREEN_WIDTH - x0);
                 self.v[0xF] = 0;
 
@@ -167,11 +173,9 @@ impl Chip8 {
                     }
                 }
                 self.dirty = true;
-                // println!("Draw");
             }
             _ => {
-                println!("Unimplemented");
-                // panic!();
+                println!("Unrecognized instruction");
             }
         }
     }
