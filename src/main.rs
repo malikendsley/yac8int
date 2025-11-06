@@ -15,22 +15,22 @@ static TIMER_HZ: f64 = 60.0;
 
 // TODO: once_cell hashmap?
 const KEYMAP: &[(Scancode, usize)] = &[
-    (Scancode::Num1, 0),
-    (Scancode::Num2, 1),
-    (Scancode::Num3, 2),
-    (Scancode::Num4, 3),
+    (Scancode::Num1, 1),
+    (Scancode::Num2, 2),
+    (Scancode::Num3, 3),
+    (Scancode::Num4, 0xC),
     (Scancode::Q, 4),
     (Scancode::W, 5),
     (Scancode::E, 6),
-    (Scancode::R, 7),
-    (Scancode::A, 8),
-    (Scancode::S, 9),
-    (Scancode::D, 10),
-    (Scancode::F, 11),
-    (Scancode::Z, 12),
-    (Scancode::X, 13),
-    (Scancode::C, 14),
-    (Scancode::V, 15),
+    (Scancode::R, 0xD),
+    (Scancode::A, 7),
+    (Scancode::S, 8),
+    (Scancode::D, 9),
+    (Scancode::F, 0xE),
+    (Scancode::Z, 0xA),
+    (Scancode::X, 0),
+    (Scancode::C, 0xB),
+    (Scancode::V, 0xF),
 ];
 
 fn map_key(scancode: Scancode) -> Option<usize> {
@@ -96,6 +96,7 @@ fn main() {
                     ..
                 } => {
                     if let Some(idx) = map_key(code) {
+                        // println!("Pressed {}", code.name());
                         chip8.keypad[idx] = true;
                     }
                 }
@@ -105,6 +106,7 @@ fn main() {
                     ..
                 } => {
                     if let Some(idx) = map_key(code) {
+                        // println!("Released {}", code.name());
                         chip8.keypad[idx] = false;
                     }
                 }
