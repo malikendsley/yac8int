@@ -37,7 +37,7 @@ pub struct Chip8 {
     sound_timer: u8,
     pc: u16,
     stack: chip8_stack::Chip8Stack,
-    keypad: [bool; 16],
+    pub keypad: [bool; 16],
     display_buffer: [u8; SCREEN_AREA],
     pub dirty: bool,
     pub load_store_quirk: bool, // When true, increments idx on save and load

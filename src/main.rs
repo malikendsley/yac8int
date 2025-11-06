@@ -13,6 +13,30 @@ const SCALE: u32 = 10;
 static CHIP8_IPS: f64 = 700.;
 static TIMER_HZ: f64 = 60.0;
 
+// TODO: once_cell hashmap?
+const KEYMAP: &[(Scancode, usize)] = &[
+    (Scancode::Num1, 0),
+    (Scancode::Num2, 1),
+    (Scancode::Num3, 2),
+    (Scancode::Num4, 3),
+    (Scancode::Q, 4),
+    (Scancode::W, 5),
+    (Scancode::E, 6),
+    (Scancode::R, 7),
+    (Scancode::A, 8),
+    (Scancode::S, 9),
+    (Scancode::D, 10),
+    (Scancode::F, 11),
+    (Scancode::Z, 12),
+    (Scancode::X, 13),
+    (Scancode::C, 14),
+    (Scancode::V, 15),
+];
+
+fn map_key(scancode: Scancode) -> Option<usize> {
+    KEYMAP.iter().find(|(s, _)| *s == scancode).map(|(_, i)| *i)
+}
+
 fn draw_to_texture(chip8: &chip8::Chip8, tex: &mut sdl2::render::Texture, rgb_buf: &mut [u8]) {
     let fb = chip8.display_buffer();
     for y in 0..H as usize {
@@ -69,6 +93,27 @@ fn main() {
                     scancode: Some(Scancode::Escape),
                     ..
                 } => break 'game,
+
+                Event::KeyDown {
+                    scancode: Some(code),
+                    ..
+                } => {
+                    if let Some(idx) = map_key(code) {
+                        chip8.keypad[idx] = true;
+                        println!("{} down", code.name());
+                    }
+                }
+
+                Event::KeyUp {
+                    scancode: Some(code),
+                    ..
+                } => {
+                    if let Some(idx) = map_key(code) {
+                        chip8.keypad[idx] = false;
+                        println!("{} up", code.name());
+                    }
+                }
+
                 _ => {}
             }
         }
