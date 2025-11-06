@@ -269,40 +269,20 @@ impl Chip8 {
                     self.ram[(self.idx + 2) as usize] = vx % 10;
                 }
                 0x0055 => {
-                    let i0 = self.idx as usize;
-                    println!("i0 is {}", i0);
                     let num_v = x(op);
-                    println!(
-                        "Saving {} register{}",
-                        num_v + 1,
-                        if num_v == 0 { "" } else { "s" }
-                    );
                     for i in 0..=num_v {
-                        println!("Saving register v{}", i);
-                        self.ram[i0 + i] = self.v[i];
-                        println!("RAM slot {} now contains {}", i0 + i, self.ram[i0 + i]);
+                        self.ram[self.idx as usize + i] = self.v[i];
                     }
                     if self.load_store_quirk {
-                        println!("Quirk");
                         self.idx += (num_v as u16) + 1;
                     }
                 }
                 0x0065 => {
-                    let i0 = self.idx as usize;
-                    println!("i0 is {}", i0);
                     let num_v = x(op);
-                    println!(
-                        "Loading {} register{}",
-                        num_v + 1,
-                        if num_v == 0 { "" } else { "s" }
-                    );
                     for i in 0..=num_v {
-                        println!("Loading register v{}", i);
-                        self.v[i] = self.ram[i0 + i];
-                        println!("Register {} now contains {}", i, self.v[i]);
+                        self.v[i] = self.ram[self.idx as usize + i];
                     }
                     if self.load_store_quirk {
-                        println!("Quirk");
                         self.idx += (num_v as u16) + 1;
                     }
                 }
@@ -312,16 +292,14 @@ impl Chip8 {
             },
 
             _ => {
-                println!("Unrecognized instruction");
+                panic!("Unrecognized instruction");
             }
         }
     }
 
     pub fn step(&mut self) {
-        // Read 2 bytes at the PC
         let op = self.fetch();
         self.pc += 2;
-        // println!("Fetched {:04X}", op);
         self.decode_execute(op);
     }
 

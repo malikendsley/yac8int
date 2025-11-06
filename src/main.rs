@@ -110,7 +110,6 @@ fn main() {
                 } => {
                     if let Some(idx) = map_key(code) {
                         chip8.keypad[idx] = false;
-                        println!("{} up", code.name());
                     }
                 }
 
@@ -142,7 +141,5 @@ fn main() {
         canvas.clear();
         canvas.copy(&tex, None, None).unwrap();
         canvas.present();
-
-        std::thread::sleep(Duration::from_micros(1_000_000 / 60));
     }
 }
