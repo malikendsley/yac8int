@@ -1,8 +1,5 @@
 use sdl2::{event::Event, keyboard::Scancode, pixels::PixelFormatEnum, render::TextureAccess};
-use std::{
-    env,
-    time::{Duration, Instant},
-};
+use std::{env, time::Instant};
 
 mod chip8;
 mod chip8_stack;

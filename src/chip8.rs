@@ -5,7 +5,6 @@ pub static SCREEN_WIDTH: usize = 64;
 pub static SCREEN_HEIGHT: usize = 32;
 pub static SCREEN_AREA: usize = SCREEN_WIDTH * SCREEN_HEIGHT;
 pub static FONT_SIZE: usize = 5;
-pub static FONT_COUNT: usize = 16;
 
 // TODO: Simple tests
 // TODO: Depending on usage, this (these) may become *size
