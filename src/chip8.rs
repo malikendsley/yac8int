@@ -42,6 +42,7 @@ pub struct Chip8 {
     pub dirty: bool,
     pub load_store_quirk: bool, // When true, increments idx on save and load
     pub jp_v0_quirk: bool,      // When true, interprets BNNN as BXNN
+    pub shift_quirk: bool,      // When true, left and right shift use Y as source operand
 }
 
 impl Default for Chip8 {
@@ -59,6 +60,7 @@ impl Default for Chip8 {
             dirty: false,
             load_store_quirk: false,
             jp_v0_quirk: true,
+            shift_quirk: true,
         };
 
         const FONT_SET: [u8; 80] = [
@@ -115,7 +117,6 @@ impl Chip8 {
             },
             1 => self.pc = nnn(op),
 
-            // TODO: Add configurable quirk described in https://tobiasvl.github.io/blog/write-a-chip-8-emulator/#bnnn-jump-with-offset
             2 => {
                 self.stack.push(self.pc);
                 self.pc = nnn(op);
@@ -143,8 +144,44 @@ impl Chip8 {
 
             7 => self.v[x(op)] = self.v[x(op)].wrapping_add(nn(op)), // Cover overflow
 
-            // TODO: Math
-            8 => {}
+            8 => match n(op) {
+                0x0000 => self.v[x(op)] = self.v[y(op)],
+                0x0001 => self.v[x(op)] = self.v[x(op)] | self.v[y(op)],
+                0x0002 => self.v[x(op)] = self.v[x(op)] & self.v[y(op)],
+                0x0003 => self.v[x(op)] = self.v[x(op)] ^ self.v[y(op)],
+                0x0004 => {
+                    let (sum, carry) = self.v[x(op)].overflowing_add(self.v[y(op)]);
+                    self.v[x(op)] = sum;
+                    self.v[0xF] = carry as u8;
+                }
+                0x0005 => {
+                    let (sum, borrow) = self.v[x(op)].overflowing_sub(self.v[y(op)]);
+                    self.v[x(op)] = sum;
+                    self.v[0xF] = !borrow as u8;
+                }
+                0x0006 => {
+                    if self.shift_quirk {
+                        self.v[x(op)] = self.v[y(op)];
+                    }
+                    self.v[0xF] = if self.v[x(op)] & 1 == 1 { 1 } else { 0 };
+                    self.v[x(op)] = self.v[x(op)] >> 1;
+                }
+                0x0007 => {
+                    let (sum, borrow) = self.v[y(op)].overflowing_sub(self.v[x(op)]);
+                    self.v[x(op)] = sum;
+                    self.v[0xF] = !borrow as u8;
+                }
+                0x000E => {
+                    if self.shift_quirk {
+                        self.v[x(op)] = self.v[y(op)];
+                    }
+                    self.v[0xF] = if self.v[x(op)] << 7 == 1 { 1 } else { 0 };
+                    self.v[x(op)] = self.v[x(op)] << 1;
+                }
+                _ => {
+                    panic!("Unrecognized 8 instruction");
+                }
+            },
 
             9 => {
                 if self.v[x(op)] != self.v[y(op)] {
@@ -231,7 +268,6 @@ impl Chip8 {
                     self.ram[(self.idx + 1) as usize] = (vx / 10) % 10;
                     self.ram[(self.idx + 2) as usize] = vx % 10;
                 }
-                // TODO: Does not pass Timendus, but possibly not an issue
                 0x0055 => {
                     let i0 = self.idx as usize;
                     println!("i0 is {}", i0);
