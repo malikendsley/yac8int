@@ -160,11 +160,17 @@ impl Chip8 {
                     self.v[0xF] = !borrow as u8;
                 }
                 0x0006 => {
-                    if self.shift_quirk {
-                        self.v[x(op)] = self.v[y(op)];
-                    }
-                    self.v[0xF] = if self.v[x(op)] & 1 == 1 { 1 } else { 0 };
-                    self.v[x(op)] = self.v[x(op)] >> 1;
+                    let xi = x(op) as usize;
+                    let yi = y(op) as usize;
+
+                    let src = if self.shift_quirk {
+                        self.v[yi]
+                    } else {
+                        self.v[xi]
+                    };
+                    let carry = src & 1;
+                    self.v[xi] = src >> 1;
+                    self.v[0xF] = carry;
                 }
                 0x0007 => {
                     let (sum, borrow) = self.v[y(op)].overflowing_sub(self.v[x(op)]);
@@ -172,11 +178,17 @@ impl Chip8 {
                     self.v[0xF] = !borrow as u8;
                 }
                 0x000E => {
-                    if self.shift_quirk {
-                        self.v[x(op)] = self.v[y(op)];
-                    }
-                    self.v[0xF] = if self.v[x(op)] << 7 == 1 { 1 } else { 0 };
-                    self.v[x(op)] = self.v[x(op)] << 1;
+                    let xi = x(op) as usize;
+                    let yi = y(op) as usize;
+
+                    let src = if self.shift_quirk {
+                        self.v[yi]
+                    } else {
+                        self.v[xi]
+                    };
+                    let carry = (src >> 7) & 1;
+                    self.v[xi] = src << 1;
+                    self.v[0xF] = carry;
                 }
                 _ => {
                     panic!("Unrecognized 8 instruction");
