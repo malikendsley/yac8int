@@ -67,12 +67,7 @@ fn main() {
         .position_centered()
         .build()
         .unwrap();
-    let mut canvas = window
-        .into_canvas()
-        .accelerated()
-        .present_vsync()
-        .build()
-        .unwrap();
+    let mut canvas = window.into_canvas().accelerated().build().unwrap();
 
     let creator = canvas.texture_creator();
     let mut tex = creator
@@ -84,6 +79,8 @@ fn main() {
     let mut last_time = Instant::now();
     let mut chip8_acc = 0.0;
     let mut timer_acc = 0.0;
+    let mut cycles_since_last_second = 0;
+    let mut wall_acc = 0.0;
 
     'game: loop {
         for e in event_pump.poll_iter() {
@@ -100,7 +97,6 @@ fn main() {
                 } => {
                     if let Some(idx) = map_key(code) {
                         chip8.keypad[idx] = true;
-                        println!("{} down", code.name());
                     }
                 }
 
@@ -123,14 +119,22 @@ fn main() {
 
         chip8_acc += dt * CHIP8_IPS;
         timer_acc += dt * TIMER_HZ;
+        wall_acc += dt;
 
         while chip8_acc >= 1.0 {
+            cycles_since_last_second += 1;
             chip8.step();
             chip8_acc -= 1.0;
         }
         while timer_acc >= 1.0 {
             chip8.step_timers();
             timer_acc -= 1.0;
+        }
+        while wall_acc >= 1.0 {
+            // Technically, if this runs too slow (somehow) this will be wrong
+            wall_acc -= 1.;
+            println!("Cycles per second: {}", cycles_since_last_second);
+            cycles_since_last_second = 0;
         }
 
         if chip8.dirty {
