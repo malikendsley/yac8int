@@ -1,4 +1,4 @@
-#yet another chip8 interpreter
+# yet another chip8 interpreter
 
 Implements the 34 chip8 instructions and supports most of the quirks configurably except for the display vblank one. 
 There might be some lingering bugs but it plays a lot of the games from the archive.
