@@ -40,9 +40,10 @@ pub struct Chip8 {
     pub keypad: [bool; 16],
     display_buffer: [u8; SCREEN_AREA],
     pub dirty: bool,
-    pub load_store_quirk: bool, // When true, increments idx on save and load
-    pub jp_v0_quirk: bool,      // When true, interprets BNNN as BXNN
-    pub shift_quirk: bool,      // When true, left and right shift use Y as source operand
+    pub math_123_clear_vf_quirk: bool, //Whether 8xy1, 8xy2, 8xy3 clear VF
+    pub load_store_quirk: bool,        // When true, increments idx on save and load
+    pub jp_v0_quirk: bool,             // When true, interprets BNNN as BXNN
+    pub shift_quirk: bool,             // When true, left and right shift use Y as source operand
 }
 
 impl Default for Chip8 {
@@ -58,8 +59,9 @@ impl Default for Chip8 {
             keypad: [false; 16],
             display_buffer: [0; 64 * 32],
             dirty: false,
+            math_123_clear_vf_quirk: true,
             load_store_quirk: false,
-            jp_v0_quirk: true,
+            jp_v0_quirk: false,
             shift_quirk: true,
         };
 
@@ -98,6 +100,10 @@ impl Chip8 {
 
     fn fetch(&self) -> u16 {
         let pc = self.pc as usize;
+        if self.pc > 4095 {
+            eprintln!("Executed past end of RAM");
+            std::process::exit(1);
+        }
         ((self.ram[pc] as u16) << 8) | self.ram[pc + 1] as u16
     }
 
@@ -145,10 +151,30 @@ impl Chip8 {
             7 => self.v[x(op)] = self.v[x(op)].wrapping_add(nn(op)), // Cover overflow
 
             8 => match n(op) {
-                0x0000 => self.v[x(op)] = self.v[y(op)],
-                0x0001 => self.v[x(op)] = self.v[x(op)] | self.v[y(op)],
-                0x0002 => self.v[x(op)] = self.v[x(op)] & self.v[y(op)],
-                0x0003 => self.v[x(op)] = self.v[x(op)] ^ self.v[y(op)],
+                0x0000 => {
+                    self.v[x(op)] = self.v[y(op)];
+                    if self.math_123_clear_vf_quirk {
+                        self.v[0xF] = 0;
+                    }
+                }
+                0x0001 => {
+                    self.v[x(op)] = self.v[x(op)] | self.v[y(op)];
+                    if self.math_123_clear_vf_quirk {
+                        self.v[0xF] = 0;
+                    }
+                }
+                0x0002 => {
+                    self.v[x(op)] = self.v[x(op)] & self.v[y(op)];
+                    if self.math_123_clear_vf_quirk {
+                        self.v[0xF] = 0;
+                    }
+                }
+                0x0003 => {
+                    self.v[x(op)] = self.v[x(op)] ^ self.v[y(op)];
+                    if self.math_123_clear_vf_quirk {
+                        self.v[0xF] = 0;
+                    }
+                }
                 0x0004 => {
                     let (sum, carry) = self.v[x(op)].overflowing_add(self.v[y(op)]);
                     self.v[x(op)] = sum;
@@ -213,19 +239,28 @@ impl Chip8 {
             0xC => self.v[x(op)] = ((rand::rng().next_u32() & 0xFFFF) as u8) & nn(op),
 
             0xD => {
-                // Coordinates
-                let x0 = self.v[x(op)] as usize;
-                let y0 = self.v[y(op)] as usize;
-                // Clip the sprite
-                let h = n(op).min(SCREEN_HEIGHT - y0);
-                let w = 8usize.min(SCREEN_WIDTH - x0);
-                self.v[0xF] = 0;
+                let xi = x(op) as usize;
+                let yi = y(op) as usize;
+                let n = n(op) as usize;
 
+                // 1) Wrap starting point into bounds
+                let x0 = (self.v[xi] as usize) % SCREEN_WIDTH;
+                let y0 = (self.v[yi] as usize) % SCREEN_HEIGHT;
+
+                // 2) Clip sprite extents; no wrapping of drawn pixels
+                let w = usize::min(8, SCREEN_WIDTH - x0);
+                let h = usize::min(n, SCREEN_HEIGHT - y0);
+
+                if w == 0 || h == 0 {
+                    self.v[0xF] = 0;
+                    return;
+                }
+
+                self.v[0xF] = 0;
                 for row in 0..h {
                     let b = self.ram[self.idx as usize + row];
                     for col in 0..w {
-                        let bit = (b >> (7 - col)) & 1;
-                        if bit == 0 {
+                        if ((b >> (7 - col)) & 1) == 0 {
                             continue;
                         }
                         let idx = idx_from_coord(x0 + col, y0 + row);
@@ -238,7 +273,6 @@ impl Chip8 {
                 }
                 self.dirty = true;
             }
-
             0xE => match nn(op) {
                 0x009E => {
                     if self.keypad[self.v[x(op)] as usize] == true {
